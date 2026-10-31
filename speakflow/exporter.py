@@ -46,10 +46,96 @@ def trim_silence(data: np.ndarray, threshold_db: float = -45.0, pad_sec: float =
     return samples[start_idx:end_idx]
 
 
+def smart_speech_boost(
+    audio: np.ndarray,
+    target_rms_db: float = -16.0,
+    max_gain_db: float = 28.0,
+    peak_limit_db: float = -1.0,
+) -> Tuple[np.ndarray, float]:
+    """
+    Intelligent Speech Leveler & Soft Limiter for voice recordings:
+    1. Removes DC bias / microphone rumble.
+    2. Identifies active spoken speech energy (ignoring silent pauses).
+    3. Calculates makeup gain to bring quiet speech to standard broadcast/podcast volume.
+    4. Applies transparent soft-knee saturation (tanh) to tame plosives or loud spikes.
+    """
+    if len(audio) == 0:
+        return audio, 0.0
+
+    # 1. Remove DC bias
+    audio = (audio - np.mean(audio)).astype(np.float32)
+
+    # 2. Analyze active speech frames (50ms frames)
+    frame_len = 2048
+    hop_len = 1024
+    if len(audio) < frame_len:
+        speech_rms = float(np.sqrt(np.mean(audio ** 2)))
+    else:
+        n_frames = max(1, (len(audio) - frame_len) // hop_len)
+        energies = []
+        for i in range(n_frames):
+            chunk = audio[i * hop_len : i * hop_len + frame_len]
+            rms = np.sqrt(np.mean(chunk ** 2))
+            if rms > 1e-4:  # Above -80 dB
+                energies.append(rms)
+
+        if energies:
+            # 75th percentile represents typical spoken volume
+            speech_rms = float(np.percentile(energies, 75))
+        else:
+            speech_rms = float(np.sqrt(np.mean(audio ** 2)))
+
+    if speech_rms <= 1e-6:
+        return audio, 0.0
+
+    # 3. Calculate necessary gain
+    current_rms_db = 20.0 * np.log10(speech_rms)
+    needed_gain_db = target_rms_db - current_rms_db
+    applied_gain_db = max(0.0, min(max_gain_db, needed_gain_db))
+    linear_gain = 10.0 ** (applied_gain_db / 20.0)
+
+    boosted = audio * linear_gain
+
+    # 4. Soft-knee limiter at peak_limit_db to prevent clipping
+    peak_threshold = 10.0 ** (peak_limit_db / 20.0)
+    current_peak = np.max(np.abs(boosted))
+
+    if current_peak > peak_threshold:
+        # Smoothly saturate using soft tanh curve
+        ratio = boosted / peak_threshold
+        compressed = np.tanh(ratio) * peak_threshold
+        return compressed.astype(np.float32), applied_gain_db
+    else:
+        return boosted.astype(np.float32), applied_gain_db
+
+
+def apply_manual_gain(
+    audio: np.ndarray,
+    gain_db: float,
+    peak_limit_db: float = -1.0,
+) -> Tuple[np.ndarray, float]:
+    """Apply fixed gain boost in dB with soft limiter."""
+    if len(audio) == 0:
+        return audio, 0.0
+
+    audio = (audio - np.mean(audio)).astype(np.float32)
+    linear_gain = 10.0 ** (gain_db / 20.0)
+    boosted = audio * linear_gain
+
+    peak_threshold = 10.0 ** (peak_limit_db / 20.0)
+    current_peak = np.max(np.abs(boosted))
+
+    if current_peak > peak_threshold:
+        ratio = boosted / peak_threshold
+        compressed = np.tanh(ratio) * peak_threshold
+        return compressed.astype(np.float32), gain_db
+    else:
+        return boosted.astype(np.float32), gain_db
+
+
 def normalize_audio(data: np.ndarray, target_peak_db: float = -1.5) -> np.ndarray:
     """
-    Normalize peak audio to target_peak_db to ensure optimal clarity in NotebookLM
-    without digital clipping.
+    Standard peak normalization (fallback).
     """
     if len(data) == 0:
         return data
@@ -116,23 +202,38 @@ def export_session(
     phonetic_focus: str = "",
     base_dir: str = "recordings",
     auto_copy_prompt: bool = True,
+    boost_mode: str = "auto",
 ) -> Dict[str, Any]:
     """
     Export the complete session:
-    1. Trim & Normalize Audio.
-    2. Write audio.wav.
-    3. Convert to audio.m4a (preferred for NotebookLM).
-    4. Write notebooklm_source.md.
-    5. Write notebooklm_prompt.txt.
-    6. Automatically copy prompt to macOS clipboard.
+    1. Trim Silence.
+    2. Apply Smart Speech Boost / Leveler (up to +28dB clean gain).
+    3. Write audio.wav.
+    4. Convert to audio.m4a (preferred for NotebookLM).
+    5. Write notebooklm_source.md.
+    6. Write notebooklm_prompt.txt.
+    7. Automatically copy prompt to macOS clipboard.
     """
     # Create session directory
     session_dir = Path(base_dir) / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
 
     # Process audio
-    processed_audio = trim_silence(audio_data, sr=samplerate)
-    processed_audio = normalize_audio(processed_audio)
+    trimmed = trim_silence(audio_data, sr=samplerate)
+
+    # Apply voice gain boost
+    applied_gain_db = 0.0
+    if boost_mode == "auto":
+        processed_audio, applied_gain_db = smart_speech_boost(trimmed, target_rms_db=-16.0)
+    elif boost_mode.startswith("+") or boost_mode.replace(".", "", 1).isdigit():
+        try:
+            val = float(boost_mode.replace("+", "").replace("db", "").strip())
+            processed_audio, applied_gain_db = apply_manual_gain(trimmed, gain_db=val)
+        except ValueError:
+            processed_audio, applied_gain_db = smart_speech_boost(trimmed, target_rms_db=-16.0)
+    else:
+        processed_audio = normalize_audio(trimmed)
+
     duration_sec = len(processed_audio) / samplerate
     m = int(duration_sec) // 60
     s = int(duration_sec) % 60
@@ -194,6 +295,8 @@ def export_session(
         "phonetic_focus": phonetic_focus,
         "duration_sec": duration_sec,
         "duration_str": duration_str,
+        "applied_gain_db": round(applied_gain_db, 1),
+        "boost_mode": boost_mode,
         "created_at": timestamp_str,
         "wav_path": wav_path,
         "m4a_path": m4a_path if has_m4a else None,
@@ -214,5 +317,6 @@ def export_session(
         "prompt_txt_path": prompt_txt_path,
         "prompt_copied": prompt_copied,
         "duration_str": duration_str,
+        "applied_gain_db": round(applied_gain_db, 1),
         "has_m4a": has_m4a,
     }

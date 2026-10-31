@@ -36,6 +36,9 @@ from speakflow.diagnostics import (
     list_microphones,
     display_microphones_table,
     test_microphone_level,
+    get_macos_input_volume,
+    set_macos_input_volume,
+    run_quick_voice_check,
 )
 
 console = Console()
@@ -43,6 +46,7 @@ console = Console()
 # Global state
 ACTIVE_DEVICE_INDEX: Optional[int] = None
 WITH_COUNTDOWN: bool = True
+VOICE_BOOST_MODE: str = "auto"
 
 
 def show_notebooklm_guide():
@@ -162,13 +166,20 @@ def select_practice_text() -> Optional[Dict[str, Any]]:
     return None
 
 
-def handle_record_flow(practice_item: Dict[str, Any], max_duration: Optional[float] = None, no_countdown: bool = False, auto_save: bool = False):
+def handle_record_flow(
+    practice_item: Dict[str, Any],
+    max_duration: Optional[float] = None,
+    no_countdown: bool = False,
+    auto_save: bool = False,
+    boost_mode: Optional[str] = None,
+):
     """Execute the recording, reviewing, and export pipeline."""
     title = practice_item["title"]
     text = practice_item["text"]
     category = practice_item.get("category", "General")
     difficulty = practice_item.get("difficulty", "Intermediate")
     focus = practice_item.get("focus", "")
+    active_boost = boost_mode if boost_mode is not None else VOICE_BOOST_MODE
 
     # Display preview
     if sys.stdout.isatty():
@@ -263,6 +274,7 @@ def handle_record_flow(practice_item: Dict[str, Any], max_duration: Optional[flo
                 difficulty=difficulty,
                 phonetic_focus=focus,
                 auto_copy_prompt=True,
+                boost_mode=active_boost,
             )
 
             # Show post-export success and actions
@@ -288,14 +300,17 @@ def handle_post_export(res: Dict[str, Any]):
     )
 
     audio_badge = "[bold green]AAC M4A (Lightweight & Crystal Clear)[/bold green]" if res.get("has_m4a") else "[yellow]Lossless WAV[/yellow]"
+    gain_val = res.get("applied_gain_db", 0.0)
+    boost_badge = f"[bold green]+{gain_val} dB (Auto-Speech Leveler)[/bold green]" if gain_val > 0 else "[dim]Standard Headroom[/dim]"
 
     summary_text = f"""
 [bold green]🎉 Practice Session Exported Successfully![/bold green]
 
-[bold cyan]Exported Files Ready for NotebookLM:[/bold cyan]
-• [bold white]Audio Source:[/bold white]     `{res['primary_audio_path']}` ({audio_badge})
-• [bold white]Text Context Source:[/bold white] `{res['source_md_path']}`
-• [bold white]NotebookLM Prompt:[/bold white]   `{res['prompt_txt_path']}`
+[bold cyan]Voice Loudness & Quality:[/bold cyan]
+• [bold white]Audio Gain Applied:[/bold white] {boost_badge}
+• [bold white]Audio Source:[/bold white]       `{res['primary_audio_path']}` ({audio_badge})
+• [bold white]Text Context Source:[/bold white]  `{res['source_md_path']}`
+• [bold white]NotebookLM Prompt:[/bold white]    `{res['prompt_txt_path']}`
 
 {clipboard_status}
 
@@ -416,10 +431,12 @@ def handle_browse_sessions():
 
 
 def handle_device_settings():
-    """Device settings and microphone test."""
-    global ACTIVE_DEVICE_INDEX, WITH_COUNTDOWN
+    """Device settings, microphone calibration, and volume boost."""
+    global ACTIVE_DEVICE_INDEX, WITH_COUNTDOWN, VOICE_BOOST_MODE
 
     while True:
+        console.clear()
+        console.print(make_header())
         display_microphones_table()
         mics = list_microphones()
 
@@ -431,11 +448,24 @@ def handle_device_settings():
                     break
 
         countdown_str = "Enabled (3s)" if WITH_COUNTDOWN else "Disabled"
+        sys_vol = get_macos_input_volume()
+        sys_vol_str = f"{sys_vol}%" if sys_vol is not None else "N/A"
+
+        boost_label = {
+            "auto": "Auto Speech Leveler (Smart Boost)",
+            "+6": "Gentle Boost (+6 dB / 2x)",
+            "+12": "Medium Boost (+12 dB / 4x)",
+            "+18": "High Boost (+18 dB / 8x)",
+            "none": "Off (Standard Headroom)",
+        }.get(VOICE_BOOST_MODE, VOICE_BOOST_MODE)
 
         choice = questionary.select(
             f"Audio Settings (Active Mic: {current_name}):",
             choices=[
-                Choice("🎙️  Test Microphone Levels (Live VU Meter)", value="test"),
+                Choice("🎙️  Live Microphone VU Meter (Level Test)", value="test"),
+                Choice("🔊 Quick 3-Sec Voice Test & Playback (Hear Your Volume)", value="quick_check"),
+                Choice(f"⚡ Voice Booster Mode: [{boost_label}]", value="boost_mode"),
+                Choice(f"🎚️  Set macOS Input Volume to 100% (Current: {sys_vol_str})", value="max_vol"),
                 Choice("🔄 Change Active Input Microphone", value="change_mic"),
                 Choice(f"⏱️  Toggle Countdown ({countdown_str})", value="toggle_countdown"),
                 Choice("🔙 Back to Main Menu", value="back"),
@@ -445,15 +475,42 @@ def handle_device_settings():
         if choice == "test":
             test_microphone_level(device_index=ACTIVE_DEVICE_INDEX)
             questionary.press_any_key_to_continue().ask()
+        elif choice == "quick_check":
+            run_quick_voice_check(device_index=ACTIVE_DEVICE_INDEX)
+            questionary.press_any_key_to_continue().ask()
+        elif choice == "boost_mode":
+            b_choice = questionary.select(
+                "Select Voice Booster Mode:",
+                choices=[
+                    Choice("⚡ Auto Speech Leveler (Recommended: boosts quiet voice up to +28 dB)", value="auto"),
+                    Choice("🔊 Medium Boost (+12 dB / 4x volume)", value="+12"),
+                    Choice("📢 High Boost (+18 dB / 8x volume)", value="+18"),
+                    Choice("🔉 Gentle Boost (+6 dB / 2x volume)", value="+6"),
+                    Choice("⏹️  Off (Raw input without leveling)", value="none"),
+                ],
+            ).ask()
+            if b_choice:
+                VOICE_BOOST_MODE = b_choice
+                console.print(f"[bold green]✔ Voice booster mode set to: {VOICE_BOOST_MODE}[/bold green]")
+                time.sleep(1)
+        elif choice == "max_vol":
+            ok = set_macos_input_volume(100)
+            if ok:
+                console.print("[bold green]✔ macOS microphone hardware volume set to 100%![/bold green]")
+            else:
+                console.print("[yellow]Could not set macOS input volume via AppleScript.[/yellow]")
+            time.sleep(1.2)
         elif choice == "change_mic":
             mic_choices = [Choice(f"[{m['index']}] {m['name']}", value=m["index"]) for m in mics]
             mic_choices.append(Choice("Default System Mic", value=None))
             selected_idx = questionary.select("Select Microphone:", choices=mic_choices).ask()
             ACTIVE_DEVICE_INDEX = selected_idx
             console.print("[green]Active microphone updated.[/green]")
+            time.sleep(0.8)
         elif choice == "toggle_countdown":
             WITH_COUNTDOWN = not WITH_COUNTDOWN
             console.print(f"[green]Countdown set to: {WITH_COUNTDOWN}[/green]")
+            time.sleep(0.8)
         elif choice == "back" or not choice:
             break
 
@@ -507,6 +564,7 @@ def main():
     rec_parser.add_argument("--duration", "-d", type=float, default=None, help="Record for a fixed duration (seconds)")
     rec_parser.add_argument("--no-countdown", action="store_true", help="Skip the 3-second countdown")
     rec_parser.add_argument("--auto-save", action="store_true", help="Automatically save without review prompt")
+    rec_parser.add_argument("--boost", "-b", type=str, default=None, help="Voice boost mode: auto, +6, +12, +18, none")
 
     # Command: list
     subparsers.add_parser("list", help="List all saved recording sessions")
@@ -578,6 +636,7 @@ def main():
                     max_duration=args.duration,
                     no_countdown=args.no_countdown,
                     auto_save=args.auto_save,
+                    boost_mode=args.boost,
                 )
             return
 
@@ -594,6 +653,7 @@ def main():
                 max_duration=args.duration,
                 no_countdown=args.no_countdown,
                 auto_save=args.auto_save,
+                boost_mode=args.boost,
             )
     else:
         # Default: Launch interactive menu

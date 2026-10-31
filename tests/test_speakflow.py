@@ -11,7 +11,7 @@ import pytest
 from speakflow.prompts import generate_notebooklm_prompt, generate_source_document_markdown
 from speakflow.library import PRACTICE_LIBRARY, get_categories, get_items_by_category, get_item_by_id
 from speakflow.ui import format_vu_meter, render_script_panel
-from speakflow.exporter import export_session, trim_silence, normalize_audio
+from speakflow.exporter import export_session, trim_silence, normalize_audio, smart_speech_boost, apply_manual_gain
 from speakflow.sessions import get_all_sessions, delete_session
 from speakflow.diagnostics import list_microphones
 
@@ -61,6 +61,19 @@ def test_vu_meter_formatting():
 
     loud = format_vu_meter(1.0) # 0 dB
     assert "0.0 dB" in loud.plain
+
+
+def test_smart_speech_boost():
+    # Simulate very quiet voice (RMS ~ -40 dB)
+    sr = 44100
+    quiet_voice = np.random.normal(0, 0.01, sr).astype(np.float32)
+    boosted, gain_db = smart_speech_boost(quiet_voice, target_rms_db=-16.0)
+
+    assert gain_db > 15.0  # Should apply substantial gain to small voice
+    boosted_rms = np.sqrt(np.mean(boosted ** 2))
+    boosted_rms_db = 20 * np.log10(boosted_rms)
+    assert boosted_rms_db > -22.0  # Loud and clear speech level
+    assert np.max(np.abs(boosted)) <= 1.0  # No clipping
 
 
 def test_audio_processing_and_export():

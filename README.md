@@ -12,8 +12,10 @@ SpeakFlow is an interactive terminal application engineered to streamline Englis
   * Animated decibel VU meter (`[████████░░░░] -16.2 dB`) to ensure your microphone levels are calibrated and avoid digital clipping.
   * In-terminal teleprompter box showing your target practice script, word count, and estimated duration.
   * Clean controls: press `<Space>` or `<Enter>` to finish recording, or `<Ctrl+C>` to cancel.
-* **⚡ Native High-Clarity Audio Export:**
-  * Automatically trims leading/trailing silence and normalizes audio headroom (-1.5 dB).
+* **⚡ Native High-Clarity Audio Export & Smart Voice Booster:**
+  * **Intelligent Speech Leveler (AGC):** Automatically detects spoken voice frames, analyzes speech energy, and applies up to **+28 dB of clean makeup gain** so even quiet voices or built-in laptop mics sound loud, rich, and clear.
+  * **Soft-Knee Limiter:** Tames plosives (`p`, `b`), breath pops, and desk thumps with transparent saturation (`tanh`) so you never get harsh digital distortion.
+  * Automatically trims leading/trailing silence and strips DC mic rumble.
   * Exports ultra-lightweight, crystal-clear **AAC `.m4a`** (via macOS native `afconvert`) and lossless **PCM `.wav`**.
 * **🧠 Built for Google NotebookLM:**
   * Generates **`notebooklm_source.md`**: A structured markdown reference document containing the exact target text, syllable stress guidelines, and target phonetics.

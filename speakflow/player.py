@@ -19,7 +19,17 @@ from rich.text import Text
 console = Console()
 
 
-def play_audio_file(filepath: str, title: str = "Audio Playback") -> bool:
+def speak_phrase(phrase: str, rate: int = 140) -> bool:
+    """
+    Play native reference pronunciation using macOS native speech synthesizer.
+    """
+    try:
+        console.print(f"[bold cyan]🗣️  Native Pronunciation Model:[/bold cyan] [bright_white]\"{phrase}\"[/bright_white]")
+        subprocess.run(["say", "-r", str(rate), phrase], check=True)
+        return True
+    except Exception as e:
+        console.print(f"[yellow]Could not play speech model: {e}[/yellow]")
+        return False
     """
     Play an audio file (WAV, M4A, etc.) using macOS native afplay or soundfile.
     Displays a playback status in the terminal.

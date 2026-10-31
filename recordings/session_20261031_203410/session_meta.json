@@ -1,0 +1,18 @@
+{
+  "session_id": "session_20261031_203410",
+  "title": "Custom Speaking Practice",
+  "text": "Study of scarcity and choices",
+  "category": "Custom Practice",
+  "difficulty": "Personal",
+  "phonetic_focus": "",
+  "duration_sec": 1.5246485260770974,
+  "duration_str": "00:01",
+  "applied_gain_db": 28.0,
+  "boost_mode": "auto",
+  "created_at": "2026-10-31 20:34:10",
+  "wav_path": "recordings/session_20261031_203410/session_20261031_203410_audio.wav",
+  "m4a_path": "recordings/session_20261031_203410/session_20261031_203410_audio.m4a",
+  "primary_audio_path": "recordings/session_20261031_203410/session_20261031_203410_audio.m4a",
+  "source_md_path": "recordings/session_20261031_203410/session_20261031_203410_notebooklm_source.md",
+  "prompt_txt_path": "recordings/session_20261031_203410/session_20261031_203410_notebooklm_prompt.txt"
+}

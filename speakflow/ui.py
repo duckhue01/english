@@ -76,6 +76,59 @@ def format_vu_meter(rms: float, width: int = 26) -> Text:
     return meter
 
 
+def render_phrase_teleprompter(
+    phrase: str,
+    full_ipa: str,
+    word_cards: list,
+    connected_cues: list,
+) -> Panel:
+    """
+    Render an enhanced teleprompter box displaying the target phrase,
+    real-time IPA symbols, syllable stress marks, and linking cues.
+    """
+    grid = Table.grid(expand=True)
+    grid.add_column()
+
+    header = Text()
+    header.append("🎯 TARGET PRACTICE PHRASE:\n", style="bold yellow")
+    header.append(f'"{phrase}"\n\n', style="bold bright_white")
+
+    header.append("🔤 PHONETIC GUIDE (IPA & STRESS):\n", style="bold cyan")
+    header.append(f"/{full_ipa}/\n\n", style="bold bright_cyan on black")
+
+    # Word-by-word quick badges
+    badges = Text()
+    badges.append("Syllable Stress:  ", style="dim")
+    for card in word_cards:
+        badges.append(f"{card['word']} ", style="bold white")
+        badges.append(f"{card['stress_visual']}   ", style="bold yellow")
+    badges.append("\n\n")
+
+    # Quick pronunciation tips
+    tips_table = Table.grid(expand=True, padding=(0, 1))
+    tips_table.add_column(style="bold cyan", width=14)
+    tips_table.add_column(style="dim white")
+
+    for card in word_cards:
+        if card["tips"]:
+            tips_table.add_row(f"• {card['word']}:", card["tips"][0])
+
+    grid.add_row(header)
+    grid.add_row(badges)
+    grid.add_row(tips_table)
+
+    if connected_cues:
+        grid.add_row(Text(f"\n🌊 Linking Flow: {connected_cues[0]}", style="dim yellow"))
+
+    return Panel(
+        grid,
+        title="[bold green]PRONUNCIATION TELEPROMPTER[/bold green]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(1, 2),
+    )
+
+
 def render_script_panel(
     title: str,
     text: str,

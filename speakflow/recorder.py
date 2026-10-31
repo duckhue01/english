@@ -55,19 +55,23 @@ def record_session(
     device_index: Optional[int] = None,
     with_countdown: bool = True,
     max_duration: Optional[float] = None,
+    custom_panel: Optional[Panel] = None,
 ) -> Optional[Tuple[np.ndarray, int]]:
     """
     Record voice while displaying the teleprompter text and live audio level.
     Pressing [Space], [Enter], or [q] stops the recording cleanly.
     Pressing [Ctrl+C] aborts.
     """
-    script_panel = render_script_panel(
-        title=title,
-        text=text,
-        category=category,
-        difficulty=difficulty,
-        focus_notes=focus_notes,
-    )
+    if custom_panel is not None:
+        script_panel = custom_panel
+    else:
+        script_panel = render_script_panel(
+            title=title,
+            text=text,
+            category=category,
+            difficulty=difficulty,
+            focus_notes=focus_notes,
+        )
 
     if with_countdown:
         run_countdown(seconds=3, script_panel=script_panel)

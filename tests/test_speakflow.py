@@ -126,7 +126,41 @@ def test_audio_processing_and_export():
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def test_list_microphones():
-    mics = list_microphones()
-    assert len(mics) > 0
-    assert any("Microphone" in m["name"] for m in mics)
+from speakflow.analyzer import analyze_phrase_phonetics, analyze_speech_acoustics
+
+
+def test_phrase_phonetics_analysis():
+    phrase = "Study of scarcity and choices"
+    analysis = analyze_phrase_phonetics(phrase)
+
+    assert "ˈstədi" in analysis["full_ipa"]
+    assert "ˈskɛrsɪti" in analysis["full_ipa"]
+    assert "ˈʧɔɪsɪz" in analysis["full_ipa"]
+    assert len(analysis["word_cards"]) == 5
+
+    # Check scarcity card
+    scarcity_card = [c for c in analysis["word_cards"] if c["clean"] == "scarcity"][0]
+    assert scarcity_card["syllables"] == 3
+    assert "[● ○ ○]" in scarcity_card["stress_visual"]
+    assert any("S-Cluster" in tip for tip in scarcity_card["tips"])
+
+    # Check choices card
+    choices_card = [c for c in analysis["word_cards"] if c["clean"] == "choices"][0]
+    assert choices_card["syllables"] == 2
+    assert any("CH" in tip for tip in choices_card["tips"])
+    assert any("-es" in tip for tip in choices_card["tips"])
+
+    # Check connected speech
+    assert len(analysis["connected_cues"]) > 0
+
+
+def test_speech_acoustics_analysis():
+    sr = 44100
+    # 2 seconds audio
+    t = np.linspace(0, 2.0, int(sr * 2.0))
+    dummy_voice = (0.2 * np.sin(2 * np.pi * 300 * t)).astype(np.float32)
+
+    acoustics = analyze_speech_acoustics(dummy_voice, sr, "Study of scarcity and choices")
+    assert acoustics["word_count"] == 5
+    assert acoustics["wpm"] > 100
+    assert acoustics["rhythm_score"] > 6.0

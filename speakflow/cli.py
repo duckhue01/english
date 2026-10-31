@@ -17,10 +17,16 @@ from rich.markdown import Markdown
 from rich.text import Text
 
 from speakflow import __version__
-from speakflow.ui import make_header, render_script_panel
+from speakflow.ui import make_header, render_script_panel, render_phrase_teleprompter
 from speakflow.library import PRACTICE_LIBRARY, get_categories, get_items_by_category
 from speakflow.recorder import record_session
-from speakflow.player import play_audio_file, play_audio_array
+from speakflow.player import play_audio_file, play_audio_array, speak_phrase
+from speakflow.analyzer import (
+    analyze_phrase_phonetics,
+    analyze_speech_acoustics,
+    render_phrase_coaching_card,
+    render_realtime_feedback_card,
+)
 from speakflow.exporter import (
     export_session,
     copy_to_clipboard,
@@ -164,6 +170,133 @@ def select_practice_text() -> Optional[Dict[str, Any]]:
             return None
 
     return None
+
+
+def handle_phrase_coach_flow(initial_phrase: Optional[str] = None):
+    """
+    Dedicated interactive coach for phrases.
+    Provides instant IPA breakdown, syllable stress, mouth/tongue tips,
+    and real-time feedback on pacing, rhythm, and acoustic flow.
+    """
+    current_phrase = initial_phrase
+
+    while True:
+        if not current_phrase:
+            if not sys.stdin.isatty():
+                current_phrase = "Study of scarcity and choices"
+            else:
+                entered = questionary.text(
+                    "Enter a phrase or sentence to practice:",
+                    default="Study of scarcity and choices",
+                ).ask()
+                if not entered or not entered.strip():
+                    break
+                current_phrase = entered.strip()
+
+        # Phonetic analysis
+        analysis = analyze_phrase_phonetics(current_phrase)
+
+        # Show coaching card
+        console.clear()
+        console.print(make_header())
+        card = render_phrase_coaching_card(analysis)
+        console.print(card)
+
+        action = questionary.select(
+            f"Phrase Coach: \"{current_phrase}\"",
+            choices=[
+                Choice("🎙️  Record Voice & Get Real-Time Feedback", value="record"),
+                Choice("🗣️  Listen to Native Audio Model (Reference)", value="listen_native"),
+                Choice("✏️  Practice a Different Phrase", value="change_phrase"),
+                Choice("🏠 Return to Main Menu", value="back"),
+            ],
+        ).ask()
+
+        if action == "listen_native":
+            speak_phrase(current_phrase, rate=140)
+            questionary.press_any_key_to_continue().ask()
+            continue
+        elif action == "change_phrase":
+            current_phrase = None
+            continue
+        elif action == "back" or not action:
+            break
+
+        # Recording loop
+        teleprompter = render_phrase_teleprompter(
+            phrase=current_phrase,
+            full_ipa=analysis["full_ipa"],
+            word_cards=analysis["word_cards"],
+            connected_cues=analysis["connected_cues"],
+        )
+
+        while True:
+            record_res = record_session(
+                title=f"Phrase: {current_phrase}",
+                text=current_phrase,
+                category="Phrase Lab",
+                difficulty="Focused Drill",
+                focus_notes=f"IPA: /{analysis['full_ipa']}/",
+                device_index=ACTIVE_DEVICE_INDEX,
+                with_countdown=WITH_COUNTDOWN,
+                custom_panel=teleprompter,
+            )
+
+            if record_res is None:
+                break
+
+            audio_data, samplerate = record_res
+
+            # Acoustic and speech rhythm feedback
+            acoustics = analyze_speech_acoustics(audio_data, samplerate, current_phrase)
+
+            # Show feedback loop
+            fb_action = None
+            while fb_action not in ("save", "rerecord", "done"):
+                console.clear()
+                console.print(make_header())
+                feedback_panel = render_realtime_feedback_card(analysis, acoustics)
+                console.print(feedback_panel)
+
+                fb_action = questionary.select(
+                    "Real-Time Pronunciation Options:",
+                    choices=[
+                        Choice("🔊 Play Back Your Recording", value="play_user"),
+                        Choice("🗣️  Listen to Native Reference (Compare)", value="play_native"),
+                        Choice("🔄 Try Again (Re-record with Instant Audit)", value="rerecord"),
+                        Choice("💾 Save & Export Package for NotebookLM", value="save"),
+                        Choice("🔙 Back to Phrase Lab", value="done"),
+                    ],
+                ).ask()
+
+                if fb_action == "play_user":
+                    play_audio_array(audio_data, samplerate, title=f"Your Recording: {current_phrase}")
+                    questionary.press_any_key_to_continue().ask()
+                elif fb_action == "play_native":
+                    speak_phrase(current_phrase, rate=140)
+                    questionary.press_any_key_to_continue().ask()
+                elif fb_action == "save":
+                    session_id = f"phrase_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    export_result = export_session(
+                        audio_data=audio_data,
+                        samplerate=samplerate,
+                        session_id=session_id,
+                        title=f"Phrase: {current_phrase}",
+                        text=current_phrase,
+                        category="Phrase Pronunciation Lab",
+                        difficulty="Drill",
+                        phonetic_focus=(
+                            f"Target IPA: /{analysis['full_ipa']}/\n"
+                            + "\n".join(f"- {c['word']} (/{c['ipa']}/): {c['tips'][0]}" for c in analysis["word_cards"] if c["tips"])
+                        ),
+                        auto_copy_prompt=True,
+                        boost_mode=VOICE_BOOST_MODE,
+                    )
+                    handle_post_export(export_result)
+                    break
+
+            if fb_action != "rerecord":
+                break
 
 
 def handle_record_flow(
@@ -524,7 +657,8 @@ def run_interactive_menu():
         menu_choice = questionary.select(
             "Main Menu:",
             choices=[
-                Choice("🎙️  New Practice Recording", value="record"),
+                Choice("🎯 Phrase Pronunciation Lab (Instant IPA, Tips & Real-Time Feedback)", value="phrase_coach"),
+                Choice("🎙️  Long Practice Recording (Passages & Drills)", value="record"),
                 Choice("📁 Browse Recording History", value="history"),
                 Choice("🛠️  Audio & Microphone Settings", value="settings"),
                 Choice("🧠 How to Use with NotebookLM", value="guide"),
@@ -536,7 +670,9 @@ def run_interactive_menu():
             console.print("\n[bold cyan]Thank you for using SpeakFlow! Happy speaking! 🎙️[/bold cyan]\n")
             break
 
-        if menu_choice == "record":
+        if menu_choice == "phrase_coach":
+            handle_phrase_coach_flow()
+        elif menu_choice == "record":
             item = select_practice_text()
             if item:
                 handle_record_flow(item)
@@ -555,6 +691,10 @@ def main():
         description="SpeakFlow: Terminal Voice Studio for English Pronunciation Analysis in NotebookLM.",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
+
+    # Command: phrase / coach
+    phrase_parser = subparsers.add_parser("phrase", help="Instant IPA, pronunciation tips & real-time feedback for a phrase")
+    phrase_parser.add_argument("phrase_text", nargs="?", default="Study of scarcity and choices", help="Phrase to practice")
 
     # Command: record
     rec_parser = subparsers.add_parser("record", help="Start a recording session directly")
@@ -584,7 +724,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "list":
+    if args.command == "phrase":
+        handle_phrase_coach_flow(args.phrase_text)
+    elif args.command == "list":
         display_sessions_table()
     elif args.command == "play":
         sessions = get_all_sessions()

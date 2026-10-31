@@ -12,6 +12,8 @@ setup(
         "numpy>=1.20.0",
         "rich>=13.0.0",
         "questionary>=2.0.0",
+        "eng_to_ipa>=0.0.2",
+        "pronouncing>=0.3.0",
     ],
     entry_points={
         "console_scripts": [

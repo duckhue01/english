@@ -30,6 +30,9 @@ def speak_phrase(phrase: str, rate: int = 140) -> bool:
     except Exception as e:
         console.print(f"[yellow]Could not play speech model: {e}[/yellow]")
         return False
+
+
+def play_audio_file(filepath: str, title: str = "Audio Playback") -> bool:
     """
     Play an audio file (WAV, M4A, etc.) using macOS native afplay or soundfile.
     Displays a playback status in the terminal.

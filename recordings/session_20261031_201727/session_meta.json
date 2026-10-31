@@ -1,0 +1,16 @@
+{
+  "session_id": "session_20261031_201727",
+  "title": "TH Phoneme Test",
+  "text": "The thirty-three thousand feathers tickled their throats.",
+  "category": "CLI Practice",
+  "difficulty": "Custom",
+  "phonetic_focus": "",
+  "duration_sec": 1.4635374149659863,
+  "duration_str": "00:01",
+  "created_at": "2026-10-31 20:17:27",
+  "wav_path": "recordings/session_20261031_201727/session_20261031_201727_audio.wav",
+  "m4a_path": "recordings/session_20261031_201727/session_20261031_201727_audio.m4a",
+  "primary_audio_path": "recordings/session_20261031_201727/session_20261031_201727_audio.m4a",
+  "source_md_path": "recordings/session_20261031_201727/session_20261031_201727_notebooklm_source.md",
+  "prompt_txt_path": "recordings/session_20261031_201727/session_20261031_201727_notebooklm_prompt.txt"
+}

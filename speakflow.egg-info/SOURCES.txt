@@ -1,0 +1,17 @@
+setup.py
+speakflow/__init__.py
+speakflow/cli.py
+speakflow/diagnostics.py
+speakflow/exporter.py
+speakflow/library.py
+speakflow/player.py
+speakflow/prompts.py
+speakflow/recorder.py
+speakflow/sessions.py
+speakflow/ui.py
+speakflow.egg-info/PKG-INFO
+speakflow.egg-info/SOURCES.txt
+speakflow.egg-info/dependency_links.txt
+speakflow.egg-info/entry_points.txt
+speakflow.egg-info/requires.txt
+speakflow.egg-info/top_level.txt

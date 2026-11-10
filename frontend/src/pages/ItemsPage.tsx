@@ -33,14 +33,15 @@ export default function ItemsPage({ kind }: { kind: Kind }) {
     return c
   }, [items])
 
-  const title = kind === 'vocab' ? 'New vocabulary' : 'Pronunciation mistakes'
+  const title = kind === 'vocab' ? 'New vocabulary' : 'Pronunciation'
   const hint =
-    kind === 'vocab' ? 'Words you highlighted in Apple Notes.' : 'Phrases you underlined in Apple Notes.'
+    kind === 'vocab' ? 'Words you bolded in Apple Notes.' : 'Words and phrases you underlined in Apple Notes.'
 
   return (
     <section>
       <div className="page-head">
         <div>
+          <p className="section-kicker">{kind === 'vocab' ? 'Bolded Words & Idioms' : 'Underlined Words & Phrases'}</p>
           <h1>{title}</h1>
           <p className="muted">{hint}</p>
         </div>
@@ -80,11 +81,10 @@ export default function ItemsPage({ kind }: { kind: Kind }) {
         <div className="empty">
           {kind === 'vocab' ? (
             <p>
-              No vocabulary yet. Highlight words in your notes, then <b>Sync</b>. Reading highlights needs
-              Full Disk Access (see the <a href="/">Folders</a> page).
+              No vocabulary yet. Bold full words in your notes, then <b>Sync</b>.
             </p>
           ) : (
-            <p>Nothing here. Underline mispronounced phrases in your notes, then <b>Sync</b>.</p>
+            <p>Nothing here. Underline words or phrases to practice in your notes, then <b>Sync</b>.</p>
           )}
         </div>
       )}

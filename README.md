@@ -12,10 +12,10 @@ Format text directly in Apple Notes while studying or reading transcripts:
 
 | Formatting in Apple Notes | Extracted As | Purpose |
 | :--- | :--- | :--- |
-| <mark>**Highlight**</mark> | **Vocabulary** (`vocab`) | New words or idioms to learn |
+| **Bold** | **Vocabulary** (`vocab`) | New words or idioms to learn |
 | <u>**Underline**</u> | **Pronunciation Mistake** (`mistake`) | Words/phrases to practice and track (`new` → `practicing` → `fixed`) |
 
-> **Note:** If you only underline or highlight part of a word (e.g., `re`<u>`fri`</u>`gerators`), the extractor automatically snaps the selection to the full word (`refrigerators`) and captures the surrounding sentence as context.
+> **Note:** If you only underline or bold part of a word (e.g., `re`<u>`fri`</u>`gerators` or `com`**`par`**`ative`), the extractor automatically snaps the selection to the full word (`refrigerators`, `comparative`) and captures the surrounding sentence as context.
 
 ---
 
@@ -33,7 +33,7 @@ Format text directly in Apple Notes while studying or reading transcripts:
     - Coalescence (`did you` → `/dɪdʒ‿u/`)
   - **Weak Forms**: Reduces common function words (`to`, `of`, `and`, `for`, `the`) in connected phrases.
 - **Mistake Tracker**: Filter mistakes by folder, status (`new`, `practicing`, `fixed`), or search query, and attach personal practice notes.
-- **Interactive Note Reader**: Read your synced notes with highlights and underlines preserved. Click any marked span—or highlight any arbitrary text with your cursor—to inspect its pronunciation and listen at normal (`🔊`) or slow (`🐢`) speed.
+- **Interactive Note Reader**: Read your synced notes with bold vocabulary and underlines preserved. Click any marked span—or select any arbitrary text with your cursor—to inspect its pronunciation and listen at normal (`🔊`) or slow (`🐢`) speed.
 - **Free-Text Analyzer**: Paste any English sentence to get a full connected-speech breakdown.
 
 ---
@@ -68,19 +68,18 @@ Without Full Disk Access, the app automatically falls back to AppleScript (under
 
 ```text
 .
-├── backend/
-│   ├── app/
-│   │   ├── main.py          # FastAPI routes & static SPA serving
-│   │   ├── notes_source.py  # NoteStore.sqlite protobuf reader + AppleScript fallback
-│   │   ├── extract.py       # Span extraction, word snapping & sentence context
-│   │   ├── sync.py          # Folder sync service
-│   │   ├── db.py            # SQLite schema & connection helper
-│   │   └── pron/
-│   │       ├── phonemes.py  # ARPAbet → GA IPA & maximal-onset syllabifier
-│   │       ├── lexicon.py   # CMUdict + g2p_en lookup & weak forms
-│   │       └── engine.py    # Flap-T, glottal-T, linking & coalescence rules
-│   └── tests/
-│       └── test_app.py      # Pytest suite
+├── app/
+│   ├── main.py          # FastAPI routes & static SPA serving
+│   ├── notes_source.py  # NoteStore.sqlite protobuf reader + AppleScript fallback
+│   ├── extract.py       # Span extraction, word snapping & sentence context
+│   ├── sync.py          # Folder sync service
+│   ├── db.py            # SQLite schema & connection helper
+│   └── pron/
+│       ├── phonemes.py  # ARPAbet → GA IPA & maximal-onset syllabifier
+│       ├── lexicon.py   # CMUdict + g2p_en lookup & weak forms
+│       └── engine.py    # Flap-T, glottal-T, linking & coalescence rules
+├── tests/
+│   └── test_app.py      # Pytest suite
 ├── frontend/
 │   └── src/
 │       ├── api.ts           # Typed API client & Web Speech synthesis helper
@@ -93,7 +92,7 @@ Without Full Disk Access, the app automatically falls back to AppleScript (under
 
 ```bash
 # Terminal 1 – FastAPI backend on :8000
-PYTHONPATH=backend .venv/bin/uvicorn app.main:app --reload --port 8000
+.venv/bin/uvicorn app.main:app --reload --port 8000
 
 # Terminal 2 – Vite dev server on :5173 (proxies /api -> :8000)
 cd frontend && npm run dev
@@ -102,5 +101,5 @@ cd frontend && npm run dev
 ### Run Tests
 
 ```bash
-PYTHONPATH=backend .venv/bin/pytest backend/tests/test_app.py -v
+PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 ```

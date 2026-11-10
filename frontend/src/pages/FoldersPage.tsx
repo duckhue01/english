@@ -53,6 +53,7 @@ export default function FoldersPage() {
     <section>
       <div className="page-head">
         <div>
+          <p className="section-kicker">Apple Notes Sync</p>
           <h1>Folders</h1>
           <p className="muted">Choose which Apple Notes folders to learn from. Apple Notes is only read, never changed.</p>
         </div>
@@ -62,19 +63,10 @@ export default function FoldersPage() {
         </button>
       </div>
 
-      {status && !status.full_disk_access && (
-        <div className="banner warn">
-          <b>Highlights (vocabulary) are not readable yet.</b> AppleScript can see underlines but drops
-          highlights, so the app has to read the Notes database directly. To allow that:
-          <ol>
-            <li>Open <b>System Settings → Privacy &amp; Security → Full Disk Access</b>.</li>
-            <li>Turn it on for the app that runs the server (your terminal, e.g. Terminal, iTerm or Orca).</li>
-            <li>Restart that app and run <code>./run.sh</code> again.</li>
-          </ol>
+      {status && (
+        <div className="banner ok">
+          Connected via <b>{status.reader === 'notestore' ? 'Notes database' : 'AppleScript'}</b>: bold (vocabulary) and underline (pronunciation) are both supported.
         </div>
-      )}
-      {status?.full_disk_access && (
-        <div className="banner ok">Reading the Notes database directly: highlights and underlines are both supported.</div>
       )}
 
       <div className="add-row">
@@ -95,7 +87,7 @@ export default function FoldersPage() {
           Synced via <b>{report.source === 'notestore' ? 'Notes database' : 'AppleScript'}</b>:{' '}
           {report.folders.map((f) => (
             <span key={f.folder} className="report">
-              <b>{f.folder}</b> {f.notes} notes · {f.vocab} vocab · {f.mistake} mistakes
+              <b>{f.folder}</b> {f.notes} notes · {f.vocab} vocab · {f.mistake} pronunciation
               {f.new_items ? ` · ${f.new_items} new` : ''}
             </span>
           ))}
@@ -107,7 +99,7 @@ export default function FoldersPage() {
       ) : (
         <table className="table">
           <thead>
-            <tr><th>Folder</th><th>Notes</th><th>Vocab</th><th>Mistakes</th><th>Last synced</th><th /></tr>
+            <tr><th>Folder</th><th>Notes</th><th>Vocab</th><th>Pronunciation</th><th>Last synced</th><th /></tr>
           </thead>
           <tbody>
             {folders.map((f) => (

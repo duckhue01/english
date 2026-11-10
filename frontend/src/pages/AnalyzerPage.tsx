@@ -27,6 +27,7 @@ export default function AnalyzerPage() {
     <section>
       <div className="page-head">
         <div>
+          <p className="section-kicker">General American Phonetics</p>
           <h1>Analyzer</h1>
           <p className="muted">Paste any English text to see American IPA, syllable stress, linking and flap-T.</p>
         </div>

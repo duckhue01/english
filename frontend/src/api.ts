@@ -127,6 +127,8 @@ export const api = {
   note: (id: string) => req<NoteDetail>(`/notes/${encodeURIComponent(id)}`),
   analyze: (text: string) =>
     req<Token[]>('/analyze', { method: 'POST', body: JSON.stringify({ text }) }),
+  analyzeBatch: (texts: string[]) =>
+    req<Token[][]>('/analyze-batch', { method: 'POST', body: JSON.stringify({ texts }) }),
 }
 
 export function speak(text: string, rate = 0.9) {

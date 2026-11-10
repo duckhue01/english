@@ -1,6 +1,6 @@
 """Turn formatted note text into learning items.
 
-* highlight  -> kind "vocab"   (new vocabulary)
+* bold       -> kind "vocab"   (new vocabulary)
 * underline  -> kind "mistake" (pronunciation mistake)
 """
 
@@ -77,25 +77,64 @@ def _context(text: str, s: int, e: int) -> tuple[str, int]:
     return stripped, p_start + c_start
 
 
+def _whole_word_bold_ranges(bold: list[bool], heading: list[bool], text: str) -> list[tuple[int, int]]:
+    """Extract only whole-word bold spans (ignoring single-syllable stress bolds and headings)."""
+    n = len(text)
+    whole = [False] * n
+    for rs, re_ in _ranges(bold, text):
+        bs, be = rs, re_
+        while bs < be and not _WORDCH.match(text[bs]):
+            bs += 1
+        while be > bs and not _WORDCH.match(text[be - 1]):
+            be -= 1
+        if bs >= be or all(heading[bs:be]):
+            continue
+        s, e = _snap(text, bs, be)
+        # Must cover the full word(s), not just a stressed syllable inside a word,
+        # and not be a label ending with ':' or a standalone multi-word heading line.
+        if bs != s or be != e or text[be : be + 1] == ":":
+            continue
+        ls = text.rfind("\n", 0, bs) + 1
+        le = text.find("\n", be)
+        le = n if le == -1 else le
+        if text[ls:le].strip() == text[rs:re_].strip() and len(text[bs:be].split()) >= 3:
+            continue
+        for i in range(bs, be):
+            whole[i] = True
+
+    # Bridge horizontal whitespace between adjacent whole-word bold spans (e.g. <b>dairy</b> <b>farmer</b>).
+    merged: list[tuple[int, int]] = []
+    for rs, re_ in _ranges(whole, text):
+        if merged and text[merged[-1][1] : rs].strip() == "" and "\n" not in text[merged[-1][1] : rs]:
+            merged[-1] = (merged[-1][0], re_)
+        else:
+            merged.append((rs, re_))
+    return merged
+
+
 def extract_items(note_id: str, text: str, runs: list[Run]) -> list[Item]:
     n = len(text)
     under = [False] * n
-    high = [False] * n
+    bold = [False] * n
     heading = [False] * n
     for r in runs:
         for i in range(r.start, min(r.end, n)):
             if r.underline:
                 under[i] = True
-            if r.highlight:
-                high[i] = True
+            if r.bold:
+                bold[i] = True
             if r.heading:
                 heading[i] = True
 
     items: list[Item] = []
     seen: dict[tuple[str, str], int] = {}
-    for kind, flags in (("vocab", high), ("mistake", under)):
-        for rs, re_ in _ranges(flags, text):
-            s, e = _snap(text, rs, re_)
+    kind_ranges = (
+        ("vocab", _whole_word_bold_ranges(bold, heading, text), False),
+        ("mistake", _ranges(under, text), True),
+    )
+    for kind, raw_ranges, snap_words in kind_ranges:
+        for rs, re_ in raw_ranges:
+            s, e = _snap(text, rs, re_) if snap_words else (rs, re_)
             if s >= e or all(heading[s:e]) or not re.search(r"[A-Za-z]", text[s:e]):
                 continue
             phrase = re.sub(r"\s+", " ", text[s:e]).strip()

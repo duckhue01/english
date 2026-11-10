@@ -50,6 +50,10 @@ class AnalyzeIn(BaseModel):
     text: str
 
 
+class AnalyzeBatchIn(BaseModel):
+    texts: list[str]
+
+
 @app.get("/api/status")
 def status():
     fda = NoteStoreReader.available()
@@ -198,8 +202,13 @@ def analyze_text(body: AnalyzeIn):
     return analysis(text)
 
 
+@app.post("/api/analyze-batch")
+def analyze_batch(body: AnalyzeBatchIn):
+    return [analysis(t.strip()[:2000]) if t.strip() else [] for t in body.texts[:200]]
+
+
 # Serve the built frontend if present (production mode).
-_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 if _DIST.exists():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 

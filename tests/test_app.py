@@ -28,11 +28,11 @@ def test_linking_and_coalescence():
     assert phrase_ipa("bad day") == "bæd‿deɪ"
 
 
-def test_extract_underline_and_highlight():
+def test_extract_underline_and_bold():
     html = (
         "<h1>2 Specialization</h1>"
         "<div>Remember, economics is the <u>study of </u><b><u>sca</u></b><u>rcity and choices</u>. "
-        "We also learn <mark>comparative</mark> advantage.</div>"
+        "We also learn <b>comparative</b> advantage and oppor<b>tu</b>nity cost.</div>"
     )
     text, runs = html_to_runs(html)
     items = extract_items("note-1", text, runs)

@@ -1,2 +1,0 @@
-[console_scripts]
-speakflow = speakflow.cli:main

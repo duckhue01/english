@@ -1,8 +1,8 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import AnalyzerPage from './pages/AnalyzerPage'
-import FoldersPage from './pages/FoldersPage'
 import ItemsPage from './pages/ItemsPage'
 import { NotesList, NoteView } from './pages/NotesPage'
+import SpeakingPage from './pages/SpeakingPage'
 
 export default function App() {
   return (
@@ -24,20 +24,21 @@ export default function App() {
           notes<span>.coach</span>
         </NavLink>
         <nav aria-label="Primary navigation">
-          <NavLink to="/" end>Folders</NavLink>
+          <NavLink to="/" end>Notes</NavLink>
           <NavLink to="/vocab">Vocabulary</NavLink>
           <NavLink to="/pronunciation">Pronunciation</NavLink>
-          <NavLink to="/notes">Notes</NavLink>
           <NavLink to="/analyze">Analyzer</NavLink>
         </nav>
       </header>
       <main className="content">
         <Routes>
-          <Route path="/" element={<FoldersPage />} />
+          <Route path="/" element={<NotesList />} />
+          <Route path="/notes" element={<NotesList />} />
+          <Route path="/folders" element={<NotesList />} />
           <Route path="/vocab" element={<ItemsPage key="vocab" kind="vocab" />} />
           <Route path="/pronunciation" element={<ItemsPage key="pronunciation" kind="mistake" />} />
           <Route path="/mistakes" element={<ItemsPage key="mistake" kind="mistake" />} />
-          <Route path="/notes" element={<NotesList />} />
+          <Route path="/speaking" element={<SpeakingPage />} />
           <Route path="/notes/:id" element={<NoteView />} />
           <Route path="/analyze" element={<AnalyzerPage />} />
         </Routes>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from pydantic import BaseModel
 from . import db
 from .notes_source import AppleScriptReader, NoteStoreReader, get_reader
 from .pron.engine import analyze
+from .qa import evaluate_spoken_answer, get_qa_for_folder, get_shadowing_sentences
 from .sync import sync_folders
 
 app = FastAPI(title="English Notes Coach")
@@ -52,6 +54,12 @@ class AnalyzeIn(BaseModel):
 
 class AnalyzeBatchIn(BaseModel):
     texts: list[str]
+
+
+class EvaluateAnswerIn(BaseModel):
+    question: dict
+    spoken_text: str
+    duration_sec: float = 0.0
 
 
 @app.get("/api/status")
@@ -122,11 +130,12 @@ def _item_out(row: dict, with_analysis: bool = True) -> dict:
 
 @app.get("/api/items")
 def list_items(kind: str | None = None, status: str | None = None,
-               folder: str | None = None, q: str | None = None):
+               folder: str | None = None, q: str | None = None,
+               note_id: str | None = None):
     sql = """SELECT i.*, n.title AS note_title FROM items i
              LEFT JOIN notes n ON n.id = i.note_id WHERE i.active = 1"""
     args: list = []
-    for col, val in (("i.kind", kind), ("i.status", status), ("i.folder", folder)):
+    for col, val in (("i.kind", kind), ("i.status", status), ("i.folder", folder), ("i.note_id", note_id)):
         if val:
             sql += f" AND {col} = ?"
             args.append(val)
@@ -172,9 +181,16 @@ def list_notes(folder: str | None = None):
     if folder:
         sql += " WHERE n.folder = ?"
         args.append(folder)
-    sql += " ORDER BY n.folder, n.title"
     with db.connect() as con:
-        return [dict(r) for r in con.execute(sql, args)]
+        rows = [dict(r) for r in con.execute(sql, args)]
+
+    def _sort_key(row):
+        m = re.match(r"^(\d+)", row["title"].strip())
+        num = int(m.group(1)) if m else float("inf")
+        return (row.get("folder", "").lower(), num, row["title"].lower())
+
+    rows.sort(key=_sort_key)
+    return rows
 
 
 @app.get("/api/notes/{note_id:path}")
@@ -205,6 +221,21 @@ def analyze_text(body: AnalyzeIn):
 @app.post("/api/analyze-batch")
 def analyze_batch(body: AnalyzeBatchIn):
     return [analysis(t.strip()[:2000]) if t.strip() else [] for t in body.texts[:200]]
+
+
+@app.get("/api/speaking/qa")
+def list_speaking_qa(folder: str | None = None):
+    return get_qa_for_folder(folder)
+
+
+@app.get("/api/speaking/sentences")
+def list_speaking_sentences(folder: str | None = None, note_id: str | None = None, limit: int = 40):
+    return get_shadowing_sentences(folder=folder, note_id=note_id, limit=limit)
+
+
+@app.post("/api/speaking/evaluate-answer")
+def evaluate_answer_endpoint(body: EvaluateAnswerIn):
+    return evaluate_spoken_answer(body.question, body.spoken_text, body.duration_sec)
 
 
 # Serve the built frontend if present (production mode).

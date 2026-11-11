@@ -43,6 +43,7 @@ export default function ItemCard({ item, onChange }: { item: Item; onChange?: (i
         <h3>{it.text}</h3>
         <button className="icon" title="Listen (US voice)" onClick={() => speak(it.text)}>🔊</button>
         <button className="icon" title="Listen slowly" onClick={() => speak(it.text, 0.6)}>🐢</button>
+        <span className={`pill status-${it.status}`}>{it.status}</span>
         <span className="spacer" />
         <Link className="note-link" to={`/notes/${encodeURIComponent(it.note_id)}`}>
           {it.folder} › {it.note_title ?? 'note'}
@@ -60,33 +61,36 @@ export default function ItemCard({ item, onChange }: { item: Item; onChange?: (i
           <button className="link-btn" onClick={toggleCtx}>
             {showCtx ? 'hide' : 'analyze'} sentence
           </button>
+          <Link to="/speaking" className="link-btn">🎙️ shadow</Link>
         </span>
       </blockquote>
       {showCtx && ctxTokens && <Pronunciation tokens={ctxTokens} />}
 
-      {it.kind === 'mistake' && (
-        <footer className="card-foot">
-          <div className="segmented">
-            {STATUSES.map((s) => (
-              <button
-                key={s.key}
-                className={`seg seg-${s.key} ${it.status === s.key ? 'active' : ''}`}
-                disabled={saving}
-                onClick={() => update({ status: s.key })}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-          <textarea
-            placeholder="Your notes: what went wrong, a tip, the sound to fix…"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onBlur={() => comment !== it.comment && update({ comment })}
-            rows={2}
-          />
-        </footer>
-      )}
+      <footer className="card-foot">
+        <div className="segmented">
+          {STATUSES.map((s) => (
+            <button
+              key={s.key}
+              className={`seg seg-${s.key} ${it.status === s.key ? 'active' : ''}`}
+              disabled={saving}
+              onClick={() => update({ status: s.key })}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <textarea
+          placeholder={
+            it.kind === 'vocab'
+              ? 'Your notes: meaning, collocations, example sentence…'
+              : 'Your notes: what went wrong, a tip, the sound to fix…'
+          }
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          onBlur={() => comment !== it.comment && update({ comment })}
+          rows={2}
+        />
+      </footer>
     </article>
   )
 }

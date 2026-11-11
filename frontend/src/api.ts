@@ -103,11 +103,57 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-const qs = (p: Record<string, string | undefined>) => {
+const qs = (p: Record<string, string | number | undefined | null>) => {
   const s = new URLSearchParams()
-  Object.entries(p).forEach(([k, v]) => v && s.set(k, v))
+  Object.entries(p).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') {
+      s.set(k, String(v))
+    }
+  })
   const str = s.toString()
   return str ? `?${str}` : ''
+}
+
+export type QAKeyPoint = {
+  title: string
+  description: string
+  status?: 'covered' | 'partial' | 'missing'
+  matched_terms?: string[]
+}
+
+export type QAItem = {
+  id: string
+  folder: string
+  note_id: string
+  note_title: string
+  topic: string
+  subtopic: string
+  question: string
+  key_points: QAKeyPoint[]
+}
+
+export type QAEvalResult = {
+  coverage_pct: number
+  covered_count: number
+  total_points: number
+  key_points: QAKeyPoint[]
+  word_count: number
+  duration_sec: number
+  wpm: number
+  pace_feedback: string
+  summary: string
+  spoken_text: string
+}
+
+export type ShadowingSentence = {
+  id: string
+  text: string
+  target_word: string
+  kind: string
+  folder: string
+  note_id: string
+  note_title: string
+  tokens: Token[]
 }
 
 export const api = {
@@ -119,7 +165,7 @@ export const api = {
     req(`/folders/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   sync: (folders?: string[]) =>
     req<SyncReport>('/sync', { method: 'POST', body: JSON.stringify({ folders: folders ?? null }) }),
-  items: (p: { kind?: Kind; status?: string; folder?: string; q?: string }) =>
+  items: (p: { kind?: Kind; status?: string; folder?: string; q?: string; note_id?: string }) =>
     req<Item[]>(`/items${qs(p)}`),
   updateItem: (id: string, patch: { status?: Status; comment?: string }) =>
     req<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
@@ -129,6 +175,11 @@ export const api = {
     req<Token[]>('/analyze', { method: 'POST', body: JSON.stringify({ text }) }),
   analyzeBatch: (texts: string[]) =>
     req<Token[][]>('/analyze-batch', { method: 'POST', body: JSON.stringify({ texts }) }),
+  speakingQA: (folder?: string) => req<QAItem[]>(`/speaking/qa${qs({ folder })}`),
+  speakingSentences: (p: { folder?: string; note_id?: string; limit?: number }) =>
+    req<ShadowingSentence[]>(`/speaking/sentences${qs(p)}`),
+  evaluateAnswer: (body: { question: QAItem; spoken_text: string; duration_sec: number }) =>
+    req<QAEvalResult>('/speaking/evaluate-answer', { method: 'POST', body: JSON.stringify(body) }),
 }
 
 export function speak(text: string, rate = 0.9) {

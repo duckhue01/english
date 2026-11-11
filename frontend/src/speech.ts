@@ -118,22 +118,65 @@ export function useSpeechRecognition() {
   }
 }
 
+function encodeWav(samples: Float32Array, sampleRate = 16000): Blob {
+  const buffer = new ArrayBuffer(44 + samples.length * 2)
+  const view = new DataView(buffer)
+
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i))
+    }
+  }
+
+  // RIFF chunk descriptor
+  writeString(0, 'RIFF')
+  view.setUint32(4, 36 + samples.length * 2, true)
+  writeString(8, 'WAVE')
+
+  // fmt sub-chunk
+  writeString(12, 'fmt ')
+  view.setUint32(16, 16, true) // 16 for PCM
+  view.setUint16(20, 1, true) // PCM format = 1
+  view.setUint16(22, 1, true) // mono = 1
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true) // byte rate = sampleRate * 1 * 2
+  view.setUint16(32, 2, true) // block align = 2
+  view.setUint16(34, 16, true) // bits per sample = 16
+
+  // data sub-chunk
+  writeString(36, 'data')
+  view.setUint32(40, samples.length * 2, true)
+
+  // write 16-bit PCM samples
+  let offset = 44
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]))
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true)
+  }
+
+  return new Blob([view], { type: 'audio/wav' })
+}
+
 export function useAudioRecorder() {
   const [isRecording, setIsRecording] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [duration, setDuration] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const timerRef = useRef<any>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const processorRef = useRef<ScriptProcessorNode | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const samplesRef = useRef<Float32Array[]>([])
+  const timerRef = useRef<any>(null)
 
   const startRecording = useCallback(async () => {
     setError(null)
     setAudioUrl(null)
+    setAudioBlob(null)
     setDuration(0)
-    chunksRef.current = []
+    samplesRef.current = []
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Audio recording is not supported in this browser.')
@@ -141,28 +184,29 @@ export function useAudioRecorder() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, sampleRate: 16000 },
+      })
       streamRef.current = stream
 
-      const recorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = recorder
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      const audioCtx = new AudioCtx({ sampleRate: 16000 })
+      audioContextRef.current = audioCtx
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data)
-        }
+      const source = audioCtx.createMediaStreamSource(stream)
+      sourceRef.current = source
+
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1)
+      processorRef.current = processor
+
+      processor.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0)
+        samplesRef.current.push(new Float32Array(inputData))
       }
 
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        const url = URL.createObjectURL(blob)
-        setAudioUrl(url)
-        // Release tracks
-        stream.getTracks().forEach((t) => t.stop())
-        streamRef.current = null
-      }
+      source.connect(processor)
+      processor.connect(audioCtx.destination)
 
-      recorder.start(100)
       setIsRecording(true)
 
       const startTs = Date.now()
@@ -181,13 +225,45 @@ export function useAudioRecorder() {
       timerRef.current = null
     }
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+    if (processorRef.current && sourceRef.current) {
       try {
-        mediaRecorderRef.current.stop()
+        processorRef.current.disconnect()
+        sourceRef.current.disconnect()
       } catch {
         // ignore
       }
     }
+
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close()
+      } catch {
+        // ignore
+      }
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+
+    // Merge Float32Array chunks and encode as 16kHz WAV
+    const chunks = samplesRef.current
+    if (chunks.length > 0) {
+      const totalLen = chunks.reduce((acc, c) => acc + c.length, 0)
+      const merged = new Float32Array(totalLen)
+      let offset = 0
+      for (const c of chunks) {
+        merged.set(c, offset)
+        offset += c.length
+      }
+
+      const wavBlob = encodeWav(merged, 16000)
+      setAudioBlob(wavBlob)
+      const url = URL.createObjectURL(wavBlob)
+      setAudioUrl(url)
+    }
+
     setIsRecording(false)
   }, [])
 
@@ -196,6 +272,7 @@ export function useAudioRecorder() {
       URL.revokeObjectURL(audioUrl)
     }
     setAudioUrl(null)
+    setAudioBlob(null)
     setDuration(0)
     setError(null)
   }, [audioUrl])
@@ -206,12 +283,20 @@ export function useAudioRecorder() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop())
       }
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close()
+        } catch {
+          // cleanup
+        }
+      }
     }
   }, [])
 
   return {
     isRecording,
     audioUrl,
+    audioBlob,
     duration,
     error,
     startRecording,

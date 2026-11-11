@@ -7,7 +7,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +16,12 @@ from pydantic import BaseModel
 from . import db
 from .notes_source import AppleScriptReader, NoteStoreReader, get_reader
 from .pron.engine import analyze
+from .pron.scoring import (
+    evaluate_pronunciation,
+    score_with_wav2vec2_alignment,
+    score_with_whisper,
+    text_to_phonemes_ipa,
+)
 from .qa import evaluate_spoken_answer, get_qa_for_folder, get_shadowing_sentences
 from .sync import sync_folders
 
@@ -60,6 +66,10 @@ class EvaluateAnswerIn(BaseModel):
     question: dict
     spoken_text: str
     duration_sec: float = 0.0
+
+
+class G2PIn(BaseModel):
+    text: str
 
 
 @app.get("/api/status")
@@ -236,6 +246,30 @@ def list_speaking_sentences(folder: str | None = None, note_id: str | None = Non
 @app.post("/api/speaking/evaluate-answer")
 def evaluate_answer_endpoint(body: EvaluateAnswerIn):
     return evaluate_spoken_answer(body.question, body.spoken_text, body.duration_sec)
+
+
+@app.post("/api/pron/g2p")
+def convert_g2p(body: G2PIn):
+    return text_to_phonemes_ipa(body.text)
+
+
+@app.post("/api/pron/score")
+async def score_audio_pronunciation(
+    file: UploadFile = File(...),
+    target_text: str = Form(...),
+    method: str = Form("both"),
+    threshold: float = Form(0.50),
+):
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(400, "Empty audio file received")
+
+    if method == "simple":
+        return score_with_whisper(audio_bytes, target_text)
+    elif method == "advanced":
+        return score_with_wav2vec2_alignment(audio_bytes, target_text, threshold=threshold)
+    else:
+        return evaluate_pronunciation(audio_bytes, target_text, threshold=threshold)
 
 
 # Serve the built frontend if present (production mode).

@@ -30,10 +30,37 @@ function SyllableView({ s, multi }: { s: Syllable; multi: boolean }) {
   )
 }
 
-function WordView({ w }: { w: WordToken }) {
+function WordView({
+  w,
+  onClick,
+  isActive,
+}: {
+  w: WordToken
+  onClick?: () => void
+  isActive?: boolean
+}) {
   const multi = w.syllables.length > 1
+  const cls = [
+    'word',
+    w.weak ? 'weak' : '',
+    onClick ? 'interactive' : '',
+    isActive ? 'active-word' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <span className={`word ${w.weak ? 'weak' : ''}`} title={w.weak ? 'Weak form: unstressed and reduced' : undefined}>
+    <span
+      className={cls}
+      onClick={onClick}
+      title={
+        onClick
+          ? `Click to listen & practice word "${w.text}"`
+          : w.weak
+          ? 'Weak form: unstressed and reduced'
+          : undefined
+      }
+    >
       <span className="spelling">
         {w.spelling
           ? w.spelling.map((s, i) => (
@@ -85,7 +112,17 @@ export function connectedIpa(tokens: Token[]): string {
   return out.trim()
 }
 
-export default function Pronunciation({ tokens, compact = false }: { tokens: Token[]; compact?: boolean }) {
+export default function Pronunciation({
+  tokens,
+  compact = false,
+  onWordClick,
+  activeWord,
+}: {
+  tokens: Token[]
+  compact?: boolean
+  onWordClick?: (word: WordToken) => void
+  activeWord?: string | null
+}) {
   const words = tokens.filter((t): t is WordToken => t.is_word)
   if (!words.length) return null
   return (
@@ -94,7 +131,11 @@ export default function Pronunciation({ tokens, compact = false }: { tokens: Tok
         {tokens.map((t, i) =>
           t.is_word ? (
             <Fragment key={i}>
-              <WordView w={t} />
+              <WordView
+                w={t}
+                onClick={onWordClick ? () => onWordClick(t) : undefined}
+                isActive={activeWord === t.text}
+              />
               <LinkView w={t} />
             </Fragment>
           ) : (

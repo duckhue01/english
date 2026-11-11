@@ -156,6 +156,73 @@ export type ShadowingSentence = {
   tokens: Token[]
 }
 
+export type G2PPhoneme = {
+  arpabet: string
+  base: string
+  stress: number | null
+  ipa: string
+  is_vowel: boolean
+  tip?: string
+}
+
+export type G2PWord = {
+  word: string
+  arpabet: string[]
+  ipa: string
+  phonemes: G2PPhoneme[]
+}
+
+export type WhisperWord = {
+  target: string
+  spoken: string
+  status: 'correct' | 'substituted' | 'omitted' | 'inserted'
+}
+
+export type SimplePronScore = {
+  method: 'whisper'
+  accuracy_score: number
+  word_error_rate: number
+  recognized_text: string
+  target_text: string
+  words: WhisperWord[]
+}
+
+export type GOPPhoneme = {
+  arpabet: string
+  ipa: string
+  stress: number | null
+  gop_score: number
+  is_mispronounced: boolean
+  start_time: number
+  end_time: number
+  tip?: string
+}
+
+export type GOPWord = {
+  word: string
+  ipa: string
+  score: number
+  is_mispronounced: boolean
+  start_time: number
+  end_time: number
+  phonemes: GOPPhoneme[]
+}
+
+export type AdvancedPronScore = {
+  method: 'wav2vec2_gop'
+  overall_score: number
+  threshold: number
+  words: GOPWord[]
+  target_text: string
+  error?: string
+}
+
+export type PronEvaluationResult = {
+  simple: SimplePronScore
+  advanced: AdvancedPronScore
+  overall_score: number
+}
+
 export const api = {
   status: () => req<AppStatus>('/status'),
   appleFolders: () => req<AppleFolder[]>('/apple-folders'),
@@ -180,6 +247,34 @@ export const api = {
     req<ShadowingSentence[]>(`/speaking/sentences${qs(p)}`),
   evaluateAnswer: (body: { question: QAItem; spoken_text: string; duration_sec: number }) =>
     req<QAEvalResult>('/speaking/evaluate-answer', { method: 'POST', body: JSON.stringify(body) }),
+  g2p: (text: string) => req<G2PWord[]>('/pron/g2p', { method: 'POST', body: JSON.stringify({ text }) }),
+  scoreAudio: async (
+    audioBlob: Blob,
+    targetText: string,
+    method: 'simple' | 'advanced' | 'both' = 'both',
+    threshold = 0.5,
+  ): Promise<PronEvaluationResult> => {
+    const formData = new FormData()
+    formData.append('file', audioBlob, 'recording.wav')
+    formData.append('target_text', targetText)
+    formData.append('method', method)
+    formData.append('threshold', String(threshold))
+
+    const res = await fetch('/api/pron/score', {
+      method: 'POST',
+      body: formData,
+    })
+    if (!res.ok) {
+      let msg = res.statusText
+      try {
+        msg = (await res.json()).detail ?? msg
+      } catch {
+        /* ignore */
+      }
+      throw new Error(msg)
+    }
+    return res.json()
+  },
 }
 
 export function speak(text: string, rate = 0.9) {

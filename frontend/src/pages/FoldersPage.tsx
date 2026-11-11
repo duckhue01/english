@@ -59,7 +59,7 @@ export default function FoldersPage() {
         </div>
         <button className="primary" disabled={!!busy || !folders.length}
           onClick={() => run('all', async () => setReport(await api.sync()))}>
-          {busy === 'all' ? 'Syncing…' : '⟳ Sync all'}
+          {busy === 'all' ? 'Syncing…' : 'Sync all'}
         </button>
       </div>
 

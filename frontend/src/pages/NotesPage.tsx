@@ -568,7 +568,7 @@ function ShadowingBox({
             </button>
             <button
               className="instant-audio-btn play-slow"
-              onClick={() => speak(targetText, 0.6)}
+              onClick={() => speak(targetText, 'slow')}
               title="Listen slowly"
             >
               🐢 Slow
@@ -707,8 +707,8 @@ function WordPracticeStrip({
           )}
         </div>
         <div className="word-actions">
-          <button className="icon" title="Listen (US voice)" onClick={() => speak(word.text)}>🔊</button>
-          <button className="icon" title="Listen slowly" onClick={() => speak(word.text, 0.6)}>🐢</button>
+          <button className="icon" title="Listen (normal pace)" onClick={() => speak(word.text, 'normal')}>🔊</button>
+          <button className="icon" title="Listen slowly (articulate)" onClick={() => speak(word.text, 'slow')}>🐢</button>
           <button className="icon close" title="Close word practice" onClick={onClose}>✕</button>
         </div>
       </div>
@@ -761,18 +761,18 @@ function PartOverviewPanel({
         <div className="part-audio-btns">
           <button
             className="primary"
-            onClick={() => speak(wholePartText)}
+            onClick={() => speak(wholePartText, 'normal')}
             disabled={!wholePartText}
             title="Listen to the whole part at normal pace"
           >
-            🔊 Listen Part
+            🔊 Normal
           </button>
           <button
-            onClick={() => speak(wholePartText, 0.65)}
+            onClick={() => speak(wholePartText, 'slow')}
             disabled={!wholePartText}
             title="Listen to the whole part slowly"
           >
-            🐢 Slow (0.65x)
+            🐢 Slow
           </button>
           <button
             className={`seg ${showPartShadow ? 'active' : ''}`}
@@ -1328,8 +1328,8 @@ export function NoteView() {
                       <div className="line-ipa-head">
                         <Tag className="para">{renderSegs(p.segs)}</Tag>
                         <div className="line-ipa-actions">
-                          <button className="icon" title="Listen (US voice)" onClick={() => speak(cleaned)}>🔊</button>
-                          <button className="icon" title="Listen slowly" onClick={() => speak(cleaned, 0.6)}>🐢</button>
+                          <button className="icon" title="Listen (normal pace)" onClick={() => speak(cleaned, 'normal')}>🔊</button>
+                          <button className="icon" title="Listen slowly (articulate)" onClick={() => speak(cleaned, 'slow')}>🐢</button>
                           <button
                             className={`icon ${activeShadowLine === pi ? 'active' : ''}`}
                             title="Practice shadowing this line"
@@ -1391,8 +1391,8 @@ export function NoteView() {
                         ← Part Overview
                       </button>
                       <span className={`pill ${panel.item ? `kind-${panel.item.kind}` : ''}`}>{panel.title}</span>
-                      <button className="icon" title="Listen (US voice)" onClick={() => speak(panel.text)}>🔊</button>
-                      <button className="icon" title="Listen slowly" onClick={() => speak(panel.text, 0.6)}>🐢</button>
+                      <button className="icon" title="Listen (normal pace)" onClick={() => speak(panel.text, 'normal')}>🔊</button>
+                      <button className="icon" title="Listen slowly (articulate)" onClick={() => speak(panel.text, 'slow')}>🐢</button>
                       <button className="icon close" onClick={() => setPanel(null)}>✕</button>
                     </div>
                     <h3 style={{ margin: '8px 0 2px' }}>{panel.text}</h3>

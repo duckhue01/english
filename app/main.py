@@ -24,6 +24,7 @@ from .pron.scoring import (
 )
 from .qa import evaluate_spoken_answer, get_qa_for_folder, get_shadowing_sentences
 from .sync import sync_folders
+from .tts import synthesize_speech
 
 app = FastAPI(title="English Notes Coach")
 app.add_middleware(
@@ -270,6 +271,25 @@ async def score_audio_pronunciation(
         return score_with_wav2vec2_alignment(audio_bytes, target_text, threshold=threshold)
     else:
         return evaluate_pronunciation(audio_bytes, target_text, threshold=threshold)
+
+
+@app.get("/api/tts")
+def text_to_speech_endpoint(
+    text: str,
+    speed: str = "normal",
+    voice: str = "Samantha",
+):
+    try:
+        audio_path = synthesize_speech(text, speed=speed, voice=voice)
+        return FileResponse(
+            audio_path,
+            media_type="audio/mp4",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"TTS generation failed: {e}")
 
 
 # Serve the built frontend if present (production mode).

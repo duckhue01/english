@@ -37,8 +37,8 @@ export default function AnalyzerPage() {
         onKeyDown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && run()} />
       <div className="row">
         <button className="primary" onClick={() => run()} disabled={loading}>{loading ? 'Analyzing…' : 'Analyze (⌘↵)'}</button>
-        <button onClick={() => speak(text)}>🔊 Listen</button>
-        <button onClick={() => speak(text, 0.6)}>🐢 Slow</button>
+        <button onClick={() => speak(text, 'normal')}>🔊 Listen</button>
+        <button onClick={() => speak(text, 'slow')}>🐢 Slow</button>
         <span className="spacer" />
         {EXAMPLES.map((ex) => (
           <button key={ex} className="chip" onClick={() => { setText(ex); run(ex) }}>{ex.slice(0, 22)}…</button>

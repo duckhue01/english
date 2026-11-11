@@ -277,15 +277,96 @@ export const api = {
   },
 }
 
-export function speak(text: string, rate = 0.9) {
-  if (!('speechSynthesis' in window)) return
+let currentTTSAudio: HTMLAudioElement | null = null
+let cachedBrowserVoices: SpeechSynthesisVoice[] = []
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    cachedBrowserVoices = window.speechSynthesis.getVoices()
+  }
+}
+
+function getBestBrowserVoice(): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
+  if (!cachedBrowserVoices.length) {
+    cachedBrowserVoices = window.speechSynthesis.getVoices()
+  }
+  const roboticVoices = /Alex|Fred|Zarvox|Cellos|Bells|Boing|Bad News|Good News|Trinoids|Whisper/i
+  const enVoices = cachedBrowserVoices.filter(
+    (v) => v.lang.replace('_', '-').startsWith('en') && !roboticVoices.test(v.name)
+  )
+
+  // 1. Premium / Enhanced / Natural
+  const premium = enVoices.find((v) => /enhanced|premium|natural|online/i.test(v.name))
+  if (premium) return premium
+
+  // 2. High quality Google US / Samantha / Ava / Jenny / Siri
+  const preferred = enVoices.find((v) =>
+    /Google US|Samantha|Ava|Jenny|Aria|Siri|Allison/i.test(v.name)
+  )
+  if (preferred) return preferred
+
+  // 3. Any standard en-US voice
+  const usVoice = enVoices.find((v) => v.lang.replace('_', '-').startsWith('en-US'))
+  if (usVoice) return usVoice
+
+  return enVoices[0] || null
+}
+
+function speakWithBrowser(text: string, speed: 'normal' | 'slow' | 'fast' = 'normal') {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
   window.speechSynthesis.cancel()
+
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'en-US'
-  u.rate = rate
-  const voice = window.speechSynthesis
-    .getVoices()
-    .find((v) => v.lang === 'en-US' && /Samantha|Alex|Ava|Allison|Google US/i.test(v.name))
+
+  if (speed === 'slow') {
+    u.rate = 0.62
+  } else if (speed === 'fast') {
+    u.rate = 1.35
+  } else {
+    u.rate = 1.0
+  }
+  u.pitch = 1.0
+
+  const voice = getBestBrowserVoice()
   if (voice) u.voice = voice
-  window.speechSynthesis.speak(u)
+
+  setTimeout(() => {
+    window.speechSynthesis.speak(u)
+  }, 10)
+}
+
+export function speak(text: string, speedOrRate: 'normal' | 'slow' | 'fast' | number = 'normal') {
+  const clean = text.trim()
+  if (!clean) return
+
+  // Stop previous playback
+  if (currentTTSAudio) {
+    currentTTSAudio.pause()
+    currentTTSAudio.currentTime = 0
+    currentTTSAudio = null
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel()
+  }
+
+  let speed: 'normal' | 'slow' | 'fast' = 'normal'
+  if (typeof speedOrRate === 'string') {
+    speed = speedOrRate as 'normal' | 'slow' | 'fast'
+  } else if (speedOrRate <= 0.75) {
+    speed = 'slow'
+  } else if (speedOrRate >= 1.2) {
+    speed = 'fast'
+  }
+
+  // Use high-fidelity server TTS
+  const url = `/api/tts?text=${encodeURIComponent(clean)}&speed=${speed}`
+  const audio = new Audio(url)
+  currentTTSAudio = audio
+
+  audio.play().catch((err) => {
+    console.warn('Server TTS failed, falling back to browser speech:', err)
+    speakWithBrowser(clean, speed)
+  })
 }

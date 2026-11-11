@@ -41,8 +41,8 @@ export default function ItemCard({ item, onChange }: { item: Item; onChange?: (i
     <article className={`card kind-${it.kind} status-${it.status}`}>
       <header className="card-head">
         <h3>{it.text}</h3>
-        <button className="icon" title="Listen (US voice)" onClick={() => speak(it.text)}>🔊</button>
-        <button className="icon" title="Listen slowly" onClick={() => speak(it.text, 0.6)}>🐢</button>
+        <button className="icon" title="Listen (normal pace)" onClick={() => speak(it.text, 'normal')}>🔊</button>
+        <button className="icon" title="Listen slowly (articulate)" onClick={() => speak(it.text, 'slow')}>🐢</button>
         <span className={`pill status-${it.status}`}>{it.status}</span>
         <span className="spacer" />
         <Link className="note-link" to={`/notes/${encodeURIComponent(it.note_id)}`}>
